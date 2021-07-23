@@ -19,6 +19,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/github"
+	"github.com/go-git/go-git/v5"
 )
 
 type commitComments map[string]fileComments
@@ -76,6 +77,9 @@ func makeReviewTemplate(ctx context.Context, n int) string {
 	wg.Add(6)
 	showWg.Add(2)
 	var pr *github.PullRequest
+        repoURL := getCurrentRepoUrl()
+        projectOwner := getUserFromUrl(repoURL)
+        projectRepo := getProjectFromUrl(repoURL)
 	go func() {
 		start := time.Now()
 		var err error
@@ -109,7 +113,8 @@ func makeReviewTemplate(ctx context.Context, n int) string {
 	}()
 	go func() {
 		start := time.Now()
-		repoURL := fmt.Sprintf("git@github.com:%s/%s.git", projectOwner, projectRepo)
+		// repoURL := fmt.Sprintf("git@github.com:%s/%s.git", projectOwner, projectRepo)
+                // fmt.Println(repo)
 		cmd := exec.Command("git", "fetch", "-f", repoURL, "master", fmt.Sprintf("refs/pull/%d/head:refs/reviews/%d", n, n))
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -597,4 +602,29 @@ func makeDraftReviewComment(path string, position int) *github.DraftReviewCommen
 		Path:     &path,
 		Position: &position,
 	}
+}
+
+func getCurrentRepoUrl() string {
+	r, err := git.PlainOpen(".")
+	if err != nil {
+		log.Fatal(fmt.Errorf("Not a Git repository: %v", err))
+	}
+
+	cfg, err := r.Config()
+	if err != nil {
+		log.Fatal(fmt.Errorf("Can't read Git configuration: %v", err))
+	}
+
+	url := cfg.Remotes["origin"].URLs
+	return strings.Join(url, "")
+}
+
+func getUserFromUrl(url string) string {
+	split := strings.Split(url, "/")
+	return split[len(split)-2]
+}
+
+func getProjectFromUrl(url string) string {
+	split := strings.Split(url, "/")
+	return split[len(split)-1]
 }
